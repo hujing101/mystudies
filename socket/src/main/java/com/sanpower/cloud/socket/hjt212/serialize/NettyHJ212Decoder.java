@@ -2,22 +2,25 @@ package com.sanpower.cloud.socket.hjt212.serialize;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.codec.MessageToMessageDecoder;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.sanpower.cloud.socket.hjt212.model.DataPackage;
 import com.sanpower.cloud.socket.hjt212.model.DataSegment;
+import com.sanpower.cloud.socket.hjt212.server.NettyServer;
 import com.sanpower.cloud.socket.hjt212.utils.StringUtils;
 
-public class NettyHJ212Decoder extends ByteToMessageDecoder {
+public class NettyHJ212Decoder extends MessageToMessageDecoder<ByteBuf> {
+	private static final Log logger = LogFactory.getLog(NettyServer.class);
 
-	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in,
 			List<Object> out) throws Exception {
-
 		if (!in.isReadable()) {
 			return;
 		}
@@ -29,6 +32,14 @@ public class NettyHJ212Decoder extends ByteToMessageDecoder {
 			DataPackage pkg = new DataPackage();
 			ByteBuf packageHeader = byteBuf.readBytes(2);
 			pkg.setPackageHeader(new String(packageHeader.array()));
+			if (!"##".equals(pkg.getPackageHeader())) {
+				int readableBytes = byteBuf.readableBytes();
+				String msg = new String(byteBuf.readBytes(readableBytes)
+						.array());
+				logger.error("decode packets fail!Data not begin with \"##\" data={"
+						+ pkg.getPackageHeader() + msg + "}");
+				return;
+			}
 			ByteBuf dataLengthBuf = byteBuf.readBytes(4);
 			int dataLength = Integer.parseInt(
 					new String(dataLengthBuf.array()), 10);
@@ -56,12 +67,17 @@ public class NettyHJ212Decoder extends ByteToMessageDecoder {
 					dataSegmentStr.indexOf('&') - 3);
 
 			String[] cpArrays = cpStr.split("\\;");
-			Map<String,Object> map = new HashMap<String,Object>();
+			Map<String, Object> map = new HashMap<String, Object>();
 			for (int i = 0; i < cpArrays.length; i++) {
 				String[] rows = cpArrays[i].split("\\,");
-				for(String keyValueStr : rows){
+				for (String keyValueStr : rows) {
 					String[] keyValue = keyValueStr.split("\\=");
-					map.put(keyValue[0], StringUtils.getValue(keyValue[1]));
+					if(keyValue.length>1){
+						map.put(keyValue[0], StringUtils.getValue(keyValue[1]));
+					}else{
+						map.put(keyValue[0], "");
+					}
+					
 				}
 			}
 			dataSegment.setCP(map);
@@ -70,7 +86,7 @@ public class NettyHJ212Decoder extends ByteToMessageDecoder {
 			String[] temp = dataSegmentStr.split("\\;");
 			for (int i = 0; i < temp.length; i++) {
 				String[] terms = temp[i].split("\\=");
-				datas.put(terms[0],terms[1]);
+				datas.put(terms[0], terms[1]);
 			}
 
 			// String[] fields = StringUtils.getFiledName(DataSegment.class);

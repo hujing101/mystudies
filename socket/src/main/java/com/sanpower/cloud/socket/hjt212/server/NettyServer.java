@@ -126,6 +126,7 @@ public class NettyServer {
 						Delimiters.lineDelimiter()));
 				// system Handler
 				pipeline.addLast("decoder", new NettyHJ212Decoder());
+				//pipeline.addLast("decoder", new StringDecoder());
 				pipeline.addLast("encoder", new StringEncoder());
 				
 				int eventExecutorSize = 32;
